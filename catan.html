@@ -1,0 +1,2781 @@
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Catan – Minecraft World</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #050505;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #fff;
+            user-select: none;
+        }
+
+        .score-bar {
+            position: fixed;
+            left: 0;
+            right: 0;
+            top: 0;
+            height: 40px;
+            padding: 0 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            background: rgba(10, 10, 12, 0.75);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+        }
+
+        #score-pills-container {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .score-pill {
+            padding: 5px 8px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+        }
+
+        .score-pill.active {
+            background: rgba(255, 255, 255, 0.14);
+            border-color: rgba(255, 255, 255, 0.25);
+            box-shadow: 0 0 12px var(--dot-color, rgba(255, 255, 255, 0.3));
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--dot-color);
+            box-shadow: 0 0 10px var(--dot-color);
+            flex-shrink: 0;
+        }
+
+        .badge {
+            font-size: 10px;
+            margin-left: 2px;
+            opacity: 0.9;
+        }
+
+        .info-tooltip-container,
+        .rules-tooltip-container {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 150;
+        }
+
+        .info-tooltip-container {
+            left: 14px;
+        }
+
+        .rules-tooltip-container {
+            right: 14px;
+        }
+
+        .circle-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 13px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s, transform 0.2s;
+        }
+
+        .circle-btn:hover {
+            background: rgba(255, 255, 255, 0.22);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: scale(1.08);
+        }
+
+        .tooltip,
+        .tooltip-rules {
+            display: none;
+            position: absolute;
+            top: calc(100% + 10px);
+            width: 320px;
+            padding: 12px 14px;
+            background: rgba(20, 20, 22, 0.96);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 16px;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
+            font-size: 12px;
+            font-weight: 500;
+            line-height: 1.5;
+            color: rgba(255, 255, 255, 0.9);
+            pointer-events: auto;
+            z-index: 200;
+        }
+
+        .tooltip {
+            left: -5%;
+        }
+
+        .tooltip-rules {
+            right: -5%;
+        }
+
+        .tooltip::before {
+            content: "";
+            position: absolute;
+            top: -6px;
+            left: 10%;
+            transform: translateX(-50%) rotate(45deg);
+            width: 12px;
+            height: 12px;
+            background: rgba(20, 20, 22, 0.96);
+            border-left: 1px solid rgba(255, 255, 255, 0.15);
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .tooltip-rules::before {
+            content: "";
+            position: absolute;
+            top: -6px;
+            right: 10%;
+            transform: translateX(50%) rotate(45deg);
+            width: 12px;
+            height: 12px;
+            background: rgba(20, 20, 22, 0.96);
+            border-left: 1px solid rgba(255, 255, 255, 0.15);
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .info-tooltip-container:hover .tooltip,
+        .rules-tooltip-container:hover .tooltip-rules,
+        .tooltip.visible,
+        .tooltip-rules.visible {
+            display: block;
+            animation: fadeIn 0.15s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        #board {
+            position: fixed;
+            left: 0;
+            right: 0;
+            top: 40px;
+            bottom: 60px;
+            overflow: hidden;
+            background: radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.08), transparent 35%), #050505;
+        }
+
+        #tiles-layer,
+        #points-layer {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #tiles-layer {
+            z-index: 1;
+        }
+
+        #roads-layer {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        #points-layer {
+            z-index: 20;
+            pointer-events: none;
+        }
+
+        .hex {
+            position: absolute;
+            width: var(--hex-size);
+            height: var(--hex-size);
+            background-color: #111;
+            background-size: cover;
+            background-position: center;
+            clip-path: polygon(50% 0%, 95% 25%, 95% 75%, 50% 100%, 5% 75%, 5% 25%);
+            transform: translate3d(var(--x), var(--y), 0) scale(1);
+            transform-origin: center;
+            overflow: hidden;
+            cursor: pointer;
+            will-change: transform;
+        }
+
+        .hex::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image: inherit;
+            background-size: cover;
+            background-position: center;
+            transition: transform 0.8s ease;
+            z-index: 0;
+        }
+
+        .hex::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.26), transparent 42%),
+                linear-gradient(315deg, rgba(0, 0, 0, 0.28), transparent 48%);
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .hex:hover::after {
+            transform: scale(1.2);
+        }
+
+        .hex:hover {
+            filter: brightness(1.15);
+            z-index: 5;
+        }
+
+        .hex.has-robber::after {
+            content: "☠️";
+            position: absolute;
+            left: 55%;
+            top: 55%;
+            z-index: 5;
+            font-size: 48px;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.8));
+            background-image: none !important;
+            /* usuwa tło */
+            background: none !important;
+        }
+
+        .tile-number {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            z-index: 4;
+            width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            background: rgba(255, 244, 214, 0.94);
+            border: 2px solid rgba(75, 45, 18, 0.75);
+            color: #3a2412;
+            font-size: 16px;
+            font-weight: 900;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.42), inset 0 2px 4px rgba(255, 255, 255, 0.8);
+            pointer-events: none;
+        }
+
+        .tile-number.hot-number {
+            color: #c62828;
+            border-color: rgba(198, 40, 40, 0.82);
+        }
+
+        .port-marker {
+            position: absolute;
+            z-index: 6;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 900;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            padding: 2px 6px;
+            color: #fff;
+            white-space: nowrap;
+        }
+
+        .hex.producing {
+            animation: hexProducingGlow 1.8s ease-out;
+        }
+
+        @keyframes hexProducingGlow {
+            0% {
+                filter: brightness(0.9) saturate(0.8);
+            }
+
+            30% {
+                filter: brightness(1.6) saturate(1.5);
+            }
+
+            70% {
+                filter: brightness(1.3) saturate(1.2);
+            }
+
+            100% {
+                filter: brightness(1) saturate(1);
+            }
+        }
+
+        .vertex-point {
+            position: absolute;
+            left: var(--x);
+            top: var(--y);
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.36);
+            border: 2px solid rgba(255, 255, 255, 0.9);
+            transform: translate(-50%, -50%) scale(0.72);
+            opacity: 0;
+            cursor: pointer;
+            pointer-events: auto;
+            transition: opacity 0.15s, transform 0.15s, background 0.15s;
+        }
+
+        #board:hover .vertex-point {
+            opacity: 0.28;
+        }
+
+        body.mode-settlement #board:hover .vertex-point {
+            opacity: 0.55;
+        }
+
+        body.mode-settlement .vertex-point {
+            opacity: 0.42;
+        }
+
+        .vertex-point:hover {
+            opacity: 1 !important;
+            transform: translate(-50%, -50%) scale(1.35);
+            background: rgba(255, 255, 255, 0.95);
+            border-color: #fff;
+            z-index: 50;
+        }
+
+        .vertex-point.has-settlement,
+        .vertex-point.has-city {
+            opacity: 1 !important;
+            width: 26px;
+            height: 26px;
+            background: var(--player-color, #ff3b30);
+            border: 3px solid #fff;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .vertex-point.has-city {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+        }
+
+        .road-visible {
+            stroke: rgba(255, 255, 255, 0);
+            stroke-width: 5;
+            stroke-linecap: round;
+            pointer-events: none;
+            transition: stroke 0.15s, stroke-width 0.15s;
+        }
+
+        .road-visible.road-hover {
+            stroke: rgba(255, 255, 255, 0.72) !important;
+            stroke-width: 7;
+        }
+
+        .road-visible.road-built {
+            stroke: var(--road-color, #ff3b30) !important;
+            stroke-width: 9;
+            filter: drop-shadow(0 4px 5px rgba(0, 0, 0, 0.55));
+        }
+
+        body.mode-road .road-visible:not(.road-built) {
+            stroke: rgba(255, 255, 255, 0.24);
+        }
+
+        .road-hitbox {
+            stroke: transparent;
+            stroke-width: 24;
+            stroke-linecap: round;
+            cursor: pointer;
+            pointer-events: stroke;
+        }
+
+        .game-panel {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 60px;
+            min-height: unset;
+            padding: 6px 12px;
+            display: grid;
+            grid-template-columns: 1fr auto 1.4fr auto;
+            gap: 10px;
+            align-items: center;
+            background: rgba(10, 10, 12, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+        }
+
+        .panel-card {
+            padding: 4px 8px;
+            border-radius: 12px;
+            background: transparent !important;
+            border: none !important;
+        }
+
+        .resources-card {
+            background: rgba(255, 255, 255, 0.04) !important;
+        }
+
+        .current-player {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        .phase-label {
+            font-size: 11px;
+            padding: 6px 8px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.1);
+            letter-spacing: 0.04em;
+            font-weight: 700;
+            text-transform: uppercase;
+            display: inline-flex;
+            width: fit-content;
+            margin-left: 4px;
+        }
+
+        .dice-card {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dice-display {
+            min-width: 60px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 8px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 18px;
+            font-weight: 900;
+        }
+
+        .resources-list {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .resource-item {
+            padding: 6px 10px;
+            font-size: 16px;
+            font-weight: 700;
+            gap: 3px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+        }
+
+        .resource-item.empty {
+            opacity: 0.35;
+            filter: grayscale(0.6);
+        }
+
+        .resource-total-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 10px;
+            font-size: 11px;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.82);
+            white-space: nowrap;
+            margin-left: 6px;
+        }
+
+        .actions-card {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            padding: 8px 10px;
+            font-size: 13px;
+            font-weight: 700;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+        }
+
+        button:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.22);
+            transform: scale(1.04);
+        }
+
+        button.active {
+            background: #2196f3;
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.35;
+            filter: grayscale(0.7);
+            cursor: not-allowed;
+        }
+
+        .toast-container {
+            position: fixed;
+            right: 24px;
+            top: 40px;
+            z-index: 300;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .toast {
+            max-width: 320px;
+            padding: 10px 14px;
+            border-radius: 16px;
+            background: rgba(18, 18, 18, 0.88);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            color: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(12px);
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.35;
+            transform: translateY(-8px);
+            opacity: 0;
+            animation: toastIn 0.22s ease forwards;
+        }
+
+        .toast.success {
+            border-color: rgba(52, 199, 89, 0.45);
+        }
+
+        .toast.warning {
+            border-color: rgba(255, 204, 0, 0.5);
+        }
+
+        .toast.error {
+            border-color: rgba(255, 59, 48, 0.5);
+        }
+
+        @keyframes toastIn {
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.62);
+            backdrop-filter: blur(6px);
+            animation: toastIn 0.18s ease forwards;
+        }
+
+        .modal {
+            width: 100%;
+            max-width: 400px;
+            max-height: 86vh;
+            overflow-y: auto;
+            padding: 20px;
+            border-radius: 24px;
+            background: rgba(20, 20, 22, 0.96);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+        }
+
+        .lobby-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 1200;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(0, 0, 0, 0.5);
+            /* półprzezroczysty overlay */
+            overflow: hidden;
+            /* przycinanie wideo */
+        }
+
+        .lobby-video {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            transform: translate(-50%, -50%);
+            object-fit: cover;
+            z-index: 0;
+            /* dodatni, ale za kartą */
+        }
+
+        /* Opcjonalny ciemny overlay na wideo */
+        .lobby-overlay::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 1;
+        }
+
+        .lobby-card {
+            position: relative;
+            z-index: 2;
+            width: min(760px, 100%);
+            max-height: 92vh;
+            overflow-y: auto;
+            padding: 24px;
+            border-radius: 28px;
+            background: rgba(18, 18, 22, 0.23);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            box-shadow: 0 28px 90px rgba(0, 0, 0, 0.62);
+        }
+
+        .lobby-title {
+            font-size: 28px;
+            font-weight: 900;
+            margin-bottom: 6px;
+            margin-bottom: 18px;
+        }
+
+        .lobby-top-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            margin-bottom: 14px;
+            padding: 12px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .lobby-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: rgba(255, 255, 255, 0.48);
+            font-weight: 900;
+            margin-bottom: 10px;
+        }
+
+        .lobby-select,
+        .lobby-input {
+            height: 32px;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            padding: 0 12px;
+            font-size: 14px;
+            font-weight: 800;
+            outline: none;
+        }
+
+        .lobby-select option {
+            color: #111;
+        }
+
+        .lobby-players {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .lobby-player-row {
+            display: grid;
+            grid-template-columns: 34px 1fr 180px 130px;
+            gap: 10px;
+            align-items: center;
+            padding: 10px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .lobby-color-dot {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--lobby-color);
+            box-shadow: 0 0 14px var(--lobby-color);
+            justify-self: center;
+        }
+
+        .lobby-switch {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            height: 32px;
+            padding: 0 12px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            font-size: 13px;
+            font-weight: 900;
+            user-select: none;
+            cursor: pointer;
+        }
+
+        .lobby-switch input {
+            accent-color: #2196f3;
+        }
+
+        .lobby-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 18px;
+
+        }
+
+        .lobby-start-btn {
+            min-width: 180px;
+            font-size: 15px;
+            padding: 13px 18px;
+            background-color: #2196f3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        @media (max-width: 980px) {
+            .game-panel {
+                height: auto;
+                min-height: 60px;
+                grid-template-columns: 1fr 1fr;
+                gap: 6px;
+                padding: 8px;
+            }
+
+            #board {
+                bottom: 80px;
+            }
+
+            .score-bar {
+                padding: 0 8px;
+            }
+
+            .tooltip,
+            .tooltip-rules {
+                width: 250px;
+                left: 0;
+                right: auto;
+            }
+
+            .tooltip-rules {
+                left: auto;
+                right: 0;
+            }
+
+            .lobby-player-row {
+                grid-template-columns: 34px 1fr 130px 100px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .game-panel {
+                grid-template-columns: 1fr;
+                max-height: 160px;
+                overflow-y: auto;
+                gap: 4px;
+                padding: 6px;
+            }
+
+            #board {
+                bottom: 160px;
+            }
+
+            .score-bar {
+                padding: 0 6px;
+                gap: 4px;
+            }
+
+            .score-pill {
+                padding: 2px 5px;
+                font-size: 10px;
+            }
+
+            .circle-btn {
+                width: 20px;
+                height: 20px;
+                font-size: 11px;
+            }
+
+            .tooltip,
+            .tooltip-rules {
+                width: 200px;
+                left: 5px;
+                right: auto;
+                font-size: 11px;
+            }
+
+            .tooltip-rules {
+                left: auto;
+                right: 5px;
+            }
+
+            .current-player {
+                font-size: 12px;
+            }
+
+            .dice-display {
+                min-width: 50px;
+                height: 28px;
+                font-size: 16px;
+                padding: 0 4px;
+            }
+
+            button {
+                padding: 3px 7px;
+                font-size: 10px;
+            }
+
+            .resource-item {
+                padding: 1px 5px;
+                font-size: 10px;
+            }
+
+            .lobby-player-row {
+                grid-template-columns: 24px 100px 1fr 80px;
+                gap: 6px;
+                padding: 6px;
+            }
+
+            .lobby-select,
+            .lobby-input {
+                font-size: 12px;
+                height: 28px;
+            }
+
+            .lobby-switch {
+                font-size: 11px;
+                padding: 0 6px;
+            }
+        }
+    </style>
+</head>
+
+<body class="mode-settlement lobby-open">
+    <div id="lobby-overlay" class="lobby-overlay">
+        <video muted autoplay loop playsinline class="lobby-video">
+            <source src="background.mp4" type="video/mp4">
+            <source src="background.ogg" type="video/ogg">
+            Twój browser nie wspiera tagu video.
+        </video>
+        <div class="lobby-card">
+            <div class="lobby-title">Catan – Minecraft World</div>
+            <div class="lobby-top-row">
+                <div>
+                    <div class="lobby-label">Number of players</div>
+                    <select id="lobby-player-count" class="lobby-select" onchange="renderLobbyPlayerRows()">
+                        <option value="2">2 players</option>
+                        <option value="3" selected>3 players</option>
+                        <option value="4">4 players</option>
+                    </select>
+                </div>
+                <button class="lobby-start-btn" onclick="startGameFromLobby()">▶ Start game</button>
+            </div>
+            <div class="lobby-label" style="margin-bottom:8px">Players</div>
+            <div id="lobby-players" class="lobby-players"></div>
+            <div class="lobby-actions">
+                <button onclick="renderLobbyPlayerRows()">↻ Refresh</button>
+                <button class="lobby-start-btn" onclick="startGameFromLobby()">Start</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="score-bar" class="score-bar">
+        <div class="info-tooltip-container">
+            <div class="circle-btn" title="About the game">i</div>
+            <div class="tooltip">
+                <strong>About "Catan – Minecraft World"</strong><br>
+                🎮 A pure HTML/CSS/JS clone of the classic board game.<br>
+                🏗️ Procedural hexagonal map with unique Minecraft-style textures.<br>
+                ⚙️ Full resource management (wood, wool, wheat, clay, stone).<br>
+                🏪 Trading system with bank and special port ratios.<br>
+                🃏 Development cards: Knight, Monopoly, Road Building, Victory Points.<br>
+                ☠️ Robber mechanic triggered by rolling a 7.<br>
+                🛣️ Longest road & largest army bonuses.<br>
+                🧠 Built as a single-page interactive game – no frameworks, no backend.<br>
+                ✨ Clean UI with toast notifications and floating animations.
+            </div>
+        </div>
+        <div id="score-pills-container"></div>
+        <div class="rules-tooltip-container">
+            <div class="circle-btn" title="How to play">?</div>
+            <div class="tooltip-rules">
+                <strong>How to Play</strong><br>
+                🏆 First to 20 VP wins.<br>
+                🔄 <strong>Setup:</strong> each player places 1 settlement + 1 road forward, then again in reverse order.<br>
+                🎲 <strong>Roll dice:</strong> produces resources on tiles matching the sum (except 7).<br>
+                🏗️ <strong>Build:</strong> roads (wood + clay), settlements (wood, wool, wheat, clay), cities (3 stone + 2 wheat).<br>
+                🏪 <strong>Trade:</strong> 4:1 with bank, or better ratios at ports (3:1, 2:1 for specific resources).<br>
+                🃏 <strong>Cards:</strong> Knight (move robber & steal), Monopoly (take one resource from all), Road Building (2 free roads), Victory Point (hidden).<br>
+                ☠️ <strong>Robber:</strong> on a 7, discard half if >8 cards, then move robber to block a tile and steal from a player.<br>
+                🛣️ Longest road (≥5 segments, unbroken) gives +2 VP.<br>
+                ⚔️ Largest army (≥3 knight cards) gives +2 VP.<br>
+                📦 You may play 1 development card per turn (not the same turn you bought it).
+            </div>
+        </div>
+    </div>
+
+    <div id="board">
+        <div id="tiles-layer"></div>
+        <svg id="roads-layer"></svg>
+        <div id="points-layer"></div>
+    </div>
+
+    <div class="game-panel">
+        <div class="panel-card turn-card">
+            <div class="current-player">
+                <span id="current-player-dot" class="dot"></span>
+                <span id="current-player-name">Red</span>
+                <div id="phase-label" class="phase-label">Roll phase</div>
+            </div>
+        </div>
+        <div class="panel-card dice-card">
+            <div id="dice-display" class="dice-display">🎲</div>
+            <button id="roll-dice-btn" onclick="rollDice()">Roll dice</button>
+        </div>
+        <div class="panel-card resources-card">
+            <div id="resources-list" class="resources-list">
+            </div>
+        </div>
+        <div class="panel-card actions-card">
+            <button id="build-settlement-btn" data-mode="settlement" class="active" onclick="setBuildMode('settlement')">🏠</button>
+            <button id="build-road-btn" data-mode="road" onclick="setBuildMode('road')">🛣️</button>
+            <button id="open-shop-btn" onclick="openShopModal()">🏪</button>
+            <button id="buy-card-btn" onclick="buyDevelopmentCard()">🎴</button>
+            <button id="hand-btn" onclick="showHandModal()">🃏<span id="hand-count">0</span></button>
+            <button id="end-turn-btn" onclick="endTurn()">End</button>
+            <button onclick="resetGame()">Reset</button>
+        </div>
+    </div>
+
+    <div id="toast-container" class="toast-container"></div>
+    <div id="modal-root"></div>
+
+    <script>
+        const terrainImages = {
+            stone: "./stone.gif",
+            wool: "./wool.gif",
+            wood: "./wood.gif",
+            wheat: "./wheat.gif",
+            clay: "./clay.gif",
+            water: "./water.gif",
+            sand: "./sand.gif"
+        };
+        const terrainWeights = {
+            water: 3,
+            sand: 1,
+            wood: 8,
+            wool: 8,
+            wheat: 8,
+            clay: 6,
+            stone: 6
+        };
+        const tileNumbers = [2, 3, 4, 5, 6, 8, 9, 10, 11, 12];
+        const RESOURCE_TYPES = ["wood", "wool", "wheat", "clay", "stone"];
+        const RESOURCE_LABELS = {
+            wood: "Wood",
+            wool: "Wool",
+            wheat: "Wheat",
+            clay: "Clay",
+            stone: "Stone"
+        };
+        const RESOURCE_EMOJIS = {
+            wood: "🪵",
+            wool: "🐑",
+            wheat: "🌾",
+            clay: "🧱",
+            stone: "🪨"
+        };
+        const BUILD_COSTS = {
+            settlement: {
+                wood: 1,
+                wool: 1,
+                wheat: 1,
+                clay: 1
+            },
+            road: {
+                wood: 1,
+                clay: 1
+            },
+            city: {
+                stone: 3,
+                wheat: 2
+            },
+            developmentCard: {
+                stone: 1,
+                wool: 1,
+                wheat: 1
+            }
+        };
+        const BASE_TRADE_RATIO = 4;
+        const VICTORY_POINTS = 20;
+        const MIN_LONGEST_ROAD = 5;
+        const MIN_ARMY_SIZE = 3;
+        const HEX_GAP = 5;
+        const SAFE_INNER_PADDING = 18;
+
+        const PORT_TYPES = [{
+                type: "generic",
+                ratio: 3,
+                resource: null,
+                label: "3:1",
+                count: 4
+            },
+            {
+                type: "special",
+                ratio: 2,
+                resource: "wood",
+                label: "🪵 2:1",
+                count: 1
+            },
+            {
+                type: "special",
+                ratio: 2,
+                resource: "wool",
+                label: "🐑 2:1",
+                count: 1
+            },
+            {
+                type: "special",
+                ratio: 2,
+                resource: "wheat",
+                label: "🌾 2:1",
+                count: 1
+            },
+            {
+                type: "special",
+                ratio: 2,
+                resource: "clay",
+                label: "🧱 2:1",
+                count: 1
+            },
+            {
+                type: "special",
+                ratio: 2,
+                resource: "stone",
+                label: "🪨 2:1",
+                count: 1
+            }
+        ];
+
+        const board = document.getElementById("board");
+        const tilesLayer = document.getElementById("tiles-layer");
+        const roadsLayer = document.getElementById("roads-layer");
+        const pointsLayer = document.getElementById("points-layer");
+        const currentPlayerDot = document.getElementById("current-player-dot");
+        const currentPlayerName = document.getElementById("current-player-name");
+        const phaseLabel = document.getElementById("phase-label");
+        const diceDisplay = document.getElementById("dice-display");
+        const resourcesList = document.getElementById("resources-list");
+        const lobbyPlayers = document.getElementById("lobby-players");
+        const lobbyPlayerCount = document.getElementById("lobby-player-count");
+        const toastContainer = document.getElementById("toast-container");
+        const modalRoot = document.getElementById("modal-root");
+        const rollDiceBtn = document.getElementById("roll-dice-btn");
+        const endTurnBtn = document.getElementById("end-turn-btn");
+        const buildSettlementBtn = document.getElementById("build-settlement-btn");
+        const buildRoadBtn = document.getElementById("build-road-btn");
+        const openShopBtn = document.getElementById("open-shop-btn");
+        const buyCardBtn = document.getElementById("buy-card-btn");
+        const handBtn = document.getElementById("hand-btn");
+        const handCount = document.getElementById("hand-count");
+        const SVG_NS = "http://www.w3.org/2000/svg";
+
+        const PLAYER_COLORS_POOL = [
+            "#ff3b30", "#2196f3", "#34c759", "#f1c40f",
+            "#9b59b6", "#e67e22", "#1abc9c", "#e91e63"
+        ];
+        const DEFAULT_PLAYER_NAMES = ["Red", "Blue", "Green", "Yellow"];
+
+        let buildMode = "settlement";
+        let phase = "roll";
+        let currentPlayerIndex = 0;
+        let turnNumber = 0;
+        let gamePhase = "setup-forward";
+        let setupBackwardOrder = createSetupBackwardOrder(3);
+        let setupBackwardStep = 0;
+        let setupSettlementPlaced = false;
+        let setupRoadPlaced = false;
+        let isRolling = false;
+        let resizeTimeout;
+        let vertices = new Map();
+        let vertexList = [];
+        let edges = new Map();
+        let edgeList = [];
+        let tiles = [];
+        let shopState = {
+            give: null,
+            receive: null
+        };
+        let robberQueue = [];
+        let currentRobberEntry = null;
+        let longestRoadOwner = null;
+        let largestArmyOwner = null;
+        let robberTile = null;
+        let developmentDeck = [];
+        let pendingKnightAction = null;
+        let freeRoadsRemaining = 0;
+
+        function createStartingResources() {
+            return {
+                wood: 1,
+                wool: 1,
+                wheat: 1,
+                clay: 1,
+                stone: 1
+            };
+        }
+
+        function createPlayer(index, name = DEFAULT_PLAYER_NAMES[index] || `Player ${index + 1}`, color = PLAYER_COLORS_POOL[index], type = "human") {
+            return {
+                id: `player-${index + 1}`,
+                name: name.trim() || `Player ${index + 1}`,
+                color,
+                type,
+                resources: createStartingResources(),
+                handCards: [],
+                playedKnights: 0,
+                hasBoughtCardThisTurn: false
+            };
+        }
+
+        function createDefaultPlayers(count = 3) {
+            return Array.from({
+                length: count
+            }, (_, i) => createPlayer(i));
+        }
+
+        function createSetupBackwardOrder(count) {
+            return Array.from({
+                length: count
+            }, (_, i) => count - 1 - i);
+        }
+
+        let players = createDefaultPlayers(3);
+
+        function escapeHTML(value) {
+            return String(value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function getColorName(color) {
+            const names = {
+                "#ff3b30": "Red",
+                "#2196f3": "Blue",
+                "#34c759": "Green",
+                "#f1c40f": "Yellow",
+                "#9b59b6": "Purple",
+                "#e67e22": "Orange",
+                "#1abc9c": "Teal",
+                "#e91e63": "Pink"
+            };
+            return names[color] || color;
+        }
+
+        function renderLobbyPlayerRows() {
+            const count = Number(lobbyPlayerCount.value || 3);
+            lobbyPlayers.innerHTML = Array.from({
+                length: count
+            }, (_, i) => {
+                const existing = players[i] || createPlayer(i);
+                const color = existing.color || PLAYER_COLORS_POOL[i];
+                const options = PLAYER_COLORS_POOL.map(c =>
+                    `<option value="${c}" ${c===color?'selected':''}>${getColorName(c)}</option>`
+                ).join("");
+                return `<div class="lobby-player-row" data-player-row="${i}">
+                    <span class="lobby-color-dot" style="--lobby-color:${color}"></span>
+                    <input class="lobby-input lobby-name-input" value="${escapeHTML(`Player ${i + 1}`)}" placeholder="Nickname">
+                    <select class="lobby-select lobby-color-select" onchange="syncLobbyColorDots()">${options}</select>
+                    <label class="lobby-switch"><input type="checkbox" class="lobby-ai-toggle" ${existing.type==='ai'?'checked':''}> AI(bot)</label>
+                </div>`;
+            }).join("");
+            syncLobbyColorDots();
+        }
+
+        function syncLobbyColorDots() {
+            document.querySelectorAll(".lobby-player-row").forEach(row => {
+                const color = row.querySelector(".lobby-color-select")?.value || "#fff";
+                row.querySelector(".lobby-color-dot")?.style.setProperty("--lobby-color", color);
+            });
+        }
+
+        function readLobbyPlayers() {
+            return [...document.querySelectorAll(".lobby-player-row")].map((row, index) => {
+                const name = row.querySelector(".lobby-name-input").value.trim() || `Player ${index + 1}`;
+                const color = row.querySelector(".lobby-color-select").value;
+                const type = row.querySelector(".lobby-ai-toggle").checked ? "ai" : "human";
+                return createPlayer(index, name, color, type);
+            });
+        }
+
+        function startGameFromLobby() {
+            const nextPlayers = readLobbyPlayers();
+            const usedColors = new Set(nextPlayers.map(p => p.color));
+            if (usedColors.size !== nextPlayers.length) {
+                showToast("Each player must have a different color.", "error");
+                return;
+            }
+            players = nextPlayers;
+            setupBackwardOrder = createSetupBackwardOrder(players.length);
+            document.body.classList.remove("lobby-open");
+
+            const overlay = document.getElementById("lobby-overlay");
+            if (overlay) overlay.style.display = "none";
+
+            resetGame();
+        }
+
+        function isCurrentPlayerAI() {
+            return getCurrentPlayer()?.type === "ai";
+        }
+
+        function runAIPlayerTurn(player) {}
+
+        function maybeRunAIPlayerTurn() {
+            if (!isCurrentPlayerAI() || isSetupPhase() || isVictory()) return;
+            runAIPlayerTurn(getCurrentPlayer());
+        }
+
+        const vertexOffsets = [
+            [0.50, 0.00],
+            [0.95, 0.25],
+            [0.95, 0.75],
+            [0.50, 1.00],
+            [0.05, 0.75],
+            [0.05, 0.25]
+        ];
+
+        function getCurrentPlayer() {
+            return players[currentPlayerIndex];
+        }
+
+        function getTileSize() {
+            const w = window.innerWidth;
+            if (w < 500) return 105;
+            if (w < 900) return 125;
+            if (w < 1300) return 145;
+            return 165;
+        }
+
+        function isSetupPhase() {
+            return gamePhase === "setup-forward" || gamePhase === "setup-backward";
+        }
+
+        function isVictory() {
+            return gamePhase === "victory";
+        }
+
+        function isModalOpen() {
+            return document.body.classList.contains("modal-open");
+        }
+
+        function isRobberMode() {
+            return document.body.classList.contains("mode-robber");
+        }
+
+        function setBuildMode(mode) {
+            if (isModalOpen() || isVictory() || isRobberMode()) return;
+            const player = getCurrentPlayer();
+            if (phase !== "build") {
+                showToast("Roll the dice first.", "warning");
+                return;
+            }
+            if (freeRoadsRemaining > 0 && mode !== "road") {
+                showToast("Use free roads first.", "warning");
+                return;
+            }
+            if (!isSetupPhase() && freeRoadsRemaining === 0 && !canAfford(player, BUILD_COSTS[mode])) {
+                showToast(`Not enough resources.`, "error");
+                return;
+            }
+            if (isSetupPhase()) {
+                if (mode === "settlement" && setupSettlementPlaced) {
+                    showToast("Place a road first.", "warning");
+                    return;
+                }
+                if (mode === "road" && !setupSettlementPlaced) {
+                    showToast("Place a settlement first.", "warning");
+                    return;
+                }
+                if (mode === "road" && setupRoadPlaced) {
+                    showToast("You have already placed a road.", "warning");
+                    return;
+                }
+                if (!setupSettlementPlaced) mode = "settlement";
+                else if (!setupRoadPlaced) mode = "road";
+            }
+            buildMode = mode;
+            document.body.classList.toggle("mode-settlement", mode === "settlement");
+            document.body.classList.toggle("mode-road", mode === "road");
+            updateGameUI();
+        }
+
+        function getNeighbors(rowIndex, colIndex, mapData) {
+            const neighbors = [];
+            const odd = rowIndex % 2 === 1;
+            const pos = [
+                [rowIndex, colIndex - 1],
+                [rowIndex, colIndex + 1],
+                [rowIndex - 1, colIndex],
+                [rowIndex + 1, colIndex],
+                odd ? [rowIndex - 1, colIndex + 1] : [rowIndex - 1, colIndex - 1],
+                odd ? [rowIndex + 1, colIndex + 1] : [rowIndex + 1, colIndex - 1]
+            ];
+            for (const [r, c] of pos) {
+                if (mapData[r]?. [c]) neighbors.push(mapData[r][c]);
+            }
+            return neighbors;
+        }
+
+        function pickTerrain(rowIndex, colIndex, mapData) {
+            const neighbors = getNeighbors(rowIndex, colIndex, mapData);
+            const terrains = Object.keys(terrainWeights);
+            const wc = terrains.map(t => {
+                let s = terrainWeights[t];
+                const sc = neighbors.filter(n => n === t).length;
+                if (sc === 1) s *= 0.22;
+                if (sc >= 2) s *= 0.04;
+                return {
+                    terrain: t,
+                    score: s
+                };
+            });
+            const total = wc.reduce((a, b) => a + b.score, 0);
+            let r = Math.random() * total;
+            for (const item of wc) {
+                r -= item.score;
+                if (r <= 0) return item.terrain;
+            }
+            return terrains[0];
+        }
+
+        function pickTileNumber(terrain) {
+            if (terrain === "water" || terrain === "sand") return null;
+            return tileNumbers[Math.floor(Math.random() * tileNumbers.length)];
+        }
+
+        function distance(aX, aY, bX, bY) {
+            return Math.sqrt((aX - bX) ** 2 + (aY - bY) ** 2);
+        }
+
+        function findNearbyVertex(x, y) {
+            const md = HEX_GAP + 10;
+            for (const v of vertexList) {
+                if (distance(v.x, v.y, x, y) <= md) return v;
+            }
+            return null;
+        }
+
+        function addVertex(x, y, tile) {
+            let v = findNearbyVertex(x, y);
+            if (!v) {
+                v = {
+                    id: `v-${vertexList.length}`,
+                    x,
+                    y,
+                    sumX: x,
+                    sumY: y,
+                    count: 1,
+                    building: null,
+                    owner: null,
+                    color: null,
+                    touchingTiles: []
+                };
+                vertices.set(v.id, v);
+                vertexList.push(v);
+            } else {
+                v.sumX += x;
+                v.sumY += y;
+                v.count += 1;
+                v.x = v.sumX / v.count;
+                v.y = v.sumY / v.count;
+            }
+            v.touchingTiles.push(tile);
+            return v;
+        }
+
+        function getEdgeKey(a, b) {
+            return [a.id, b.id].sort().join("__");
+        }
+
+        function addEdge(a, b, tile) {
+            const key = getEdgeKey(a, b);
+            let e = edges.get(key);
+            if (!e) {
+                e = {
+                    id: `e-${edgeList.length}`,
+                    key,
+                    a,
+                    b,
+                    road: null,
+                    owner: null,
+                    color: null,
+                    touchingTiles: []
+                };
+                edges.set(key, e);
+                edgeList.push(e);
+            }
+            e.touchingTiles.push(tile);
+            return e;
+        }
+
+        function createHex(x, y, terrain, number) {
+            const hex = document.createElement("div");
+            hex.className = "hex";
+            hex.dataset.terrain = terrain;
+            hex.style.setProperty("--x", `${x}px`);
+            hex.style.setProperty("--y", `${y}px`);
+            hex.style.backgroundImage = `url("${terrainImages[terrain]}")`;
+            if (number !== null) {
+                const badge = document.createElement("div");
+                badge.className = "tile-number";
+                badge.textContent = number;
+                if (number === 6 || number === 8) badge.classList.add("hot-number");
+                hex.appendChild(badge);
+            }
+            tilesLayer.appendChild(hex);
+            return hex;
+        }
+
+        function createPortMarker(tile, portDef) {
+            const marker = document.createElement("div");
+            marker.className = "port-marker";
+            marker.textContent = portDef.label;
+            marker.style.left = `${tile.x + tile.size * 0.5}px`;
+            marker.style.top = `${tile.y + tile.size * 0.5}px`;
+            marker.style.transform = "translate(-50%, -50%)";
+            tilesLayer.appendChild(marker);
+        }
+
+        function registerTileInteractionPoints(tile) {
+            const tvs = vertexOffsets.map(([ox, oy]) => addVertex(tile.x + tile.size * ox, tile.y + tile.size * oy, tile));
+            for (let i = 0; i < 6; i++) addEdge(tvs[i], tvs[(i + 1) % 6], tile);
+        }
+
+        function assignPorts() {
+            const waterTiles = tiles.filter(t => t.terrain === "water");
+            const edgeWater = waterTiles.filter(t => getTileNeighbors(t).length < 6);
+            const candidates = edgeWater.length >= 9 ? edgeWater : waterTiles;
+            const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+            const selected = shuffled.slice(0, 9);
+            const portPool = [];
+            for (const pt of PORT_TYPES) {
+                for (let i = 0; i < pt.count; i++) portPool.push({
+                    ...pt
+                });
+            }
+            portPool.sort(() => Math.random() - 0.5);
+            for (let i = 0; i < Math.min(selected.length, portPool.length); i++) {
+                selected[i].port = portPool[i];
+                createPortMarker(selected[i], portPool[i]);
+            }
+        }
+
+        function getTileNeighbors(tile) {
+            const neighbors = [];
+            const odd = tile.row % 2 === 1;
+            const pos = [
+                [tile.row, tile.col - 1],
+                [tile.row, tile.col + 1],
+                [tile.row - 1, tile.col],
+                [tile.row + 1, tile.col],
+                odd ? [tile.row - 1, tile.col + 1] : [tile.row - 1, tile.col - 1],
+                odd ? [tile.row + 1, tile.col + 1] : [tile.row + 1, tile.col - 1]
+            ];
+            for (const [r, c] of pos) {
+                const n = tiles.find(t => t.row === r && t.col === c);
+                if (n) neighbors.push(n);
+            }
+            return neighbors;
+        }
+
+        function getPlayerPorts(playerId) {
+            const playerVertices = vertexList.filter(v => v.owner === playerId && v.building);
+            const accessiblePorts = [];
+            for (const v of playerVertices) {
+                for (const tile of v.touchingTiles) {
+                    if (tile.port && !accessiblePorts.some(p => p === tile.port || (p.type === tile.port.type && p.resource === tile.port.resource))) {
+                        accessiblePorts.push(tile.port);
+                    }
+                }
+            }
+            return accessiblePorts;
+        }
+
+        function getPlayerBestTradeRatio(playerId, resource) {
+            let bestRatio = BASE_TRADE_RATIO;
+            const ports = getPlayerPorts(playerId);
+            for (const port of ports) {
+                if (port.type === "generic" && port.ratio < bestRatio) bestRatio = port.ratio;
+                if (port.type === "special" && port.resource === resource && port.ratio < bestRatio) bestRatio = port.ratio;
+            }
+            return bestRatio;
+        }
+
+        function hasAdjacentRoad(vertex, playerId) {
+            for (const e of edgeList) {
+                if ((e.a === vertex || e.b === vertex) && e.owner === playerId) return true;
+            }
+            return false;
+        }
+
+        function playerHasAnySettlement(pid) {
+            return vertexList.some(v => v.owner === pid && v.building);
+        }
+
+        function playerHasConnectionAtVertex(vertex, pid) {
+            if (vertex.owner === pid && vertex.building) return true;
+            return edgeList.some(e => (e.a === vertex || e.b === vertex) && e.owner === pid && e.road);
+        }
+
+        function canBuildRoadOnEdge(edge, pid) {
+            return playerHasConnectionAtVertex(edge.a, pid) || playerHasConnectionAtVertex(edge.b, pid);
+        }
+
+        function isDistanceRuleViolated(vertex) {
+            for (const e of edgeList) {
+                if (e.a !== vertex && e.b !== vertex) continue;
+                if ((e.a === vertex ? e.b : e.a).building) return true;
+            }
+            return false;
+        }
+
+        function canAfford(player, cost) {
+            return Object.entries(cost).every(([r, a]) => player.resources[r] >= a);
+        }
+
+        function payCost(player, cost) {
+            Object.entries(cost).forEach(([r, a]) => {
+                player.resources[r] -= a;
+            });
+        }
+
+        function getTotalResources(player) {
+            return RESOURCE_TYPES.reduce((s, r) => s + player.resources[r], 0);
+        }
+
+        function getPlayerPoints(playerId) {
+            let points = vertexList.reduce((sum, v) => {
+                if (v.owner !== playerId) return sum;
+                if (v.building === "city") return sum + 2;
+                if (v.building === "settlement") return sum + 1;
+                return sum;
+            }, 0);
+            if (longestRoadOwner === playerId) points += 2;
+            if (largestArmyOwner === playerId) points += 2;
+            const p = players.find(x => x.id === playerId);
+            if (p) points += p.handCards.filter(c => c.type === "victoryPoint").length;
+            return points;
+        }
+
+        function calculateLongestRoad(playerId) {
+            const playerEdges = edgeList.filter(e => e.owner === playerId && e.road);
+            if (playerEdges.length === 0) return 0;
+            const graph = new Map();
+            for (const e of playerEdges) {
+                if (!graph.has(e.a.id)) graph.set(e.a.id, {
+                    vertex: e.a,
+                    neighbors: []
+                });
+                if (!graph.has(e.b.id)) graph.set(e.b.id, {
+                    vertex: e.b,
+                    neighbors: []
+                });
+                graph.get(e.a.id).neighbors.push(e.b.id);
+                graph.get(e.b.id).neighbors.push(e.a.id);
+            }
+            let max = 0;
+            for (const [startId] of graph) {
+                const len = dfsLongestPath(startId, graph, new Set(), playerId);
+                if (len > max) max = len;
+            }
+            return max;
+        }
+
+        function dfsLongestPath(currentId, graph, visited, playerId) {
+            visited.add(currentId);
+            const node = graph.get(currentId);
+            if (!node) return 0;
+            let max = 0;
+            for (const nid of node.neighbors) {
+                if (visited.has(nid)) continue;
+                const nn = graph.get(nid);
+                if (!nn) continue;
+                if (nn.vertex.building && nn.vertex.owner !== playerId) {
+                    if (1 > max) max = 1;
+                    continue;
+                }
+                const sub = dfsLongestPath(nid, graph, new Set(visited), playerId);
+                if (1 + sub > max) max = 1 + sub;
+            }
+            return max;
+        }
+
+        function recalculateLongestRoad() {
+            if (isSetupPhase()) return;
+            let bestId = null,
+                bestLen = 0;
+            for (const p of players) {
+                const len = calculateLongestRoad(p.id);
+                if (len >= MIN_LONGEST_ROAD && len > bestLen) {
+                    bestLen = len;
+                    bestId = p.id;
+                }
+            }
+            if (bestId && bestId !== longestRoadOwner) {
+                if (longestRoadOwner && players.find(p => p.id === longestRoadOwner)?.playedKnights === bestLen) return;
+                longestRoadOwner = bestId;
+                showToast(`🛣️ ${players.find(p=>p.id===bestId).name} has the longest road (${bestLen})!`, "success");
+                updateGameUI();
+                checkVictory();
+            } else if (!bestId && longestRoadOwner) {
+                const prev = players.find(p => p.id === longestRoadOwner);
+                longestRoadOwner = null;
+                showToast(`🛣️ ${prev.name} loses the longest road.`, "warning");
+                updateGameUI();
+                checkVictory();
+            }
+        }
+
+        function recalculateLargestArmy() {
+            let bestId = null,
+                bestCount = 0;
+            for (const p of players) {
+                if (p.playedKnights >= MIN_ARMY_SIZE && p.playedKnights > bestCount) {
+                    bestCount = p.playedKnights;
+                    bestId = p.id;
+                }
+            }
+            if (bestId && bestId !== largestArmyOwner) {
+                if (largestArmyOwner) {
+                    const curr = players.find(p => p.id === largestArmyOwner);
+                    if (curr && curr.playedKnights === bestCount) return;
+                }
+                largestArmyOwner = bestId;
+                showToast(`⚔️ ${players.find(p=>p.id===bestId).name} has the largest army (${bestCount})!`, "success");
+                updateGameUI();
+                checkVictory();
+            }
+        }
+
+        function createDevelopmentDeck() {
+            const deck = [];
+            for (let i = 0; i < 14; i++) deck.push({
+                type: "knight",
+                id: `knight-${i}`
+            });
+            for (let i = 0; i < 2; i++) deck.push({
+                type: "monopoly",
+                id: `monopoly-${i}`
+            });
+            for (let i = 0; i < 2; i++) deck.push({
+                type: "roadBuilding",
+                id: `road-${i}`
+            });
+            for (let i = 0; i < 5; i++) deck.push({
+                type: "victoryPoint",
+                id: `vp-${i}`
+            });
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+            return deck;
+        }
+
+        function buyDevelopmentCard() {
+            if (isModalOpen() || isVictory() || isRobberMode()) return;
+            const player = getCurrentPlayer();
+            if (isSetupPhase() || phase !== "build") {
+                showToast("Roll the dice first.", "warning");
+                return;
+            }
+            if (player.hasBoughtCardThisTurn) {
+                showToast("Max 1 card/turn.", "warning");
+                return;
+            }
+            if (!canAfford(player, BUILD_COSTS.developmentCard)) {
+                showToast("Not enough 🪨+🐑+🌾.", "error");
+                return;
+            }
+            if (developmentDeck.length === 0) {
+                showToast("The deck is empty.", "warning");
+                return;
+            }
+            payCost(player, BUILD_COSTS.developmentCard);
+            const card = developmentDeck.pop();
+            player.handCards.push(card);
+            player.hasBoughtCardThisTurn = true;
+            if (card.type === "victoryPoint") showToast(`${player.name} bought a card.`, "success");
+            else {
+                const names = {
+                    knight: "Knight",
+                    monopoly: "Monopoly",
+                    roadBuilding: "Road Building"
+                };
+                showToast(`${player.name}: ${names[card.type]}.`, "success");
+            }
+            updateGameUI();
+            checkVictory();
+        }
+
+        function showHandModal() {
+            if (isModalOpen() || isVictory() || isRobberMode()) return;
+            const player = getCurrentPlayer();
+            if (player.handCards.length === 0) {
+                showToast("No cards.", "warning");
+                return;
+            }
+            document.body.classList.add("modal-open");
+            const playableCards = player.handCards.filter(c => c.type !== "victoryPoint");
+            const vpCount = player.handCards.filter(c => c.type === "victoryPoint").length;
+            const rows = playableCards.map((card, idx) => {
+                const info = {
+                    knight: {
+                        emoji: "⚔️",
+                        name: "Knight",
+                        desc: "Move the robber + steal"
+                    },
+                    monopoly: {
+                        emoji: "🎯",
+                        name: "Monopoly",
+                        desc: "Everyone gives you one resource type"
+                    },
+                    roadBuilding: {
+                        emoji: "🏗️",
+                        name: "Road Building",
+                        desc: "2 free roads"
+                    }
+                } [card.type];
+                return `<div class="hand-card-row" onclick="playCard(${idx})"><span class="hand-card-emoji">${info.emoji}</span><div><div class="hand-card-name">${info.name}</div><div class="hand-card-desc">${info.desc}</div></div></div>`;
+            }).join("");
+            modalRoot.innerHTML = `<div class="modal-overlay" onclick="closeHandModal()"><div class="modal" onclick="event.stopPropagation()">
+                <div class="modal-title">🃏 Cards (${player.handCards.length})</div><div class="modal-subtitle">Click to play.</div>
+                ${rows||'<div style="text-align:center;color:rgba(255,255,255,0.4)">No playable cards.</div>'}
+                ${vpCount>0?`<div class="modal-summary">⭐ VP Cards: ${vpCount}</div>`:''}
+                <div class="modal-actions"><button onclick="closeHandModal()">Close</button></div></div></div>`;
+            window.playCard = function(index) {
+                const card = playableCards[index];
+                if (!card) return;
+                closeHandModal();
+                if (card.type === "knight") playKnight(player);
+                if (card.type === "monopoly") playMonopoly(player);
+                if (card.type === "roadBuilding") playRoadBuilding(player);
+                const realIdx = player.handCards.indexOf(card);
+                if (realIdx >= 0) player.handCards.splice(realIdx, 1);
+                updateGameUI();
+            };
+        }
+
+        function closeHandModal() {
+            document.body.classList.remove("modal-open");
+            modalRoot.innerHTML = "";
+        }
+
+        function playKnight(player) {
+            player.playedKnights++;
+            recalculateLargestArmy();
+            document.body.classList.add("mode-robber");
+            pendingKnightAction = {
+                type: "knight",
+                playerId: player.id
+            };
+            showToast("⚔️ Select a hex for the robber.", "info");
+        }
+
+        function playMonopoly(player) {
+            document.body.classList.add("modal-open");
+            const buttons = RESOURCE_TYPES.map(r =>
+                `<button class="resource-toggle" onclick="confirmMonopoly('${r}')">${RESOURCE_EMOJIS[r]} ${RESOURCE_LABELS[r]}</button>`
+            ).join("");
+            modalRoot.innerHTML = `<div class="modal-overlay"><div class="modal"><div class="modal-title">🎯 Monopoly</div><div class="modal-subtitle">Choose a resource – everyone gives theirs to you.</div><div class="resource-toggle-row">${buttons}</div><div class="modal-actions"><button onclick="closeHandModal()">Cancel</button></div></div></div>`;
+            window.confirmMonopoly = function(r) {
+                document.body.classList.remove("modal-open");
+                modalRoot.innerHTML = "";
+                let t = 0;
+                for (const p of players) {
+                    if (p.id === player.id) continue;
+                    t += p.resources[r];
+                    p.resources[r] = 0;
+                }
+                player.resources[r] += t;
+                showToast(`${player.name} takes all ${RESOURCE_EMOJIS[r]}! (${t})`, "success");
+                updateGameUI();
+            };
+        }
+
+        function playRoadBuilding(player) {
+            freeRoadsRemaining = 2;
+            buildMode = "road";
+            document.body.classList.remove("mode-settlement");
+            document.body.classList.add("mode-road");
+            showToast("🏗️ 2 free roads.", "success");
+            updateGameUI();
+        }
+
+        function onRobberHexClick(tile) {
+            if (!pendingKnightAction) return;
+            document.body.classList.remove("mode-robber");
+            if (robberTile) robberTile.hexEl.classList.remove("has-robber");
+            robberTile = tile;
+            tile.hexEl.classList.add("has-robber");
+            const player = players.find(p => p.id === pendingKnightAction.playerId);
+            const victims = [];
+            const tileVertices = vertexList.filter(v => v.touchingTiles.includes(tile));
+            for (const v of tileVertices) {
+                if (v.building && v.owner && v.owner !== player.id && !victims.some(x => x.id === v.owner)) victims.push(players.find(p => p.id === v.owner));
+            }
+            pendingKnightAction = null;
+            if (victims.length === 0) {
+                showToast("☠️ No players to steal from.", "warning");
+                updateGameUI();
+                return;
+            }
+            if (victims.length === 1) {
+                stealResource(player, victims[0]);
+                updateGameUI();
+                return;
+            }
+            document.body.classList.add("modal-open");
+            const vRows = victims.map(v =>
+                `<button onclick="confirmSteal('${player.id}','${v.id}')" style="padding:12px"><span class="dot" style="--dot-color:${v.color};width:12px;height:12px;"></span> ${v.name}</button>`
+            ).join("");
+            modalRoot.innerHTML = `<div class="modal-overlay"><div class="modal"><div class="modal-title">🎯 Choose a player</div><div class="modal-actions" style="flex-direction:column">${vRows}</div></div></div>`;
+        }
+
+        function confirmSteal(playerId, victimId) {
+            document.body.classList.remove("modal-open");
+            modalRoot.innerHTML = "";
+            stealResource(players.find(p => p.id === playerId), players.find(p => p.id === victimId));
+            updateGameUI();
+        }
+
+        function stealResource(player, victim) {
+            const available = RESOURCE_TYPES.filter(r => victim.resources[r] > 0);
+            if (!available.length) {
+                showToast(`${victim.name} has no resources.`, "warning");
+                return;
+            }
+            const stolen = available[Math.floor(Math.random() * available.length)];
+            victim.resources[stolen]--;
+            player.resources[stolen]++;
+            showToast(`${player.name} steals ${RESOURCE_EMOJIS[stolen]} from ${victim.name}!`, "success");
+        }
+        window.confirmSteal = confirmSteal;
+
+        function checkVictory() {
+            for (const p of players) {
+                if (getPlayerPoints(p.id) >= VICTORY_POINTS) {
+                    gamePhase = "victory";
+                    updateGameUI();
+                    showVictoryModal(p);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function showVictoryModal(winner) {
+            document.body.classList.add("modal-open");
+            const sorted = [...players].sort((a, b) => getPlayerPoints(b.id) - getPlayerPoints(a.id));
+            const rows = sorted.map(p => {
+                const pts = getPlayerPoints(p.id);
+                const sets = vertexList.filter(v => v.owner === p.id && v.building === "settlement").length;
+                const cities = vertexList.filter(v => v.owner === p.id && v.building === "city").length;
+                const vpCards = p.handCards.filter(c => c.type === "victoryPoint").length;
+                let det = [];
+                if (sets) det.push(`${sets} settlements`);
+                if (cities) det.push(`${cities} cities`);
+                if (longestRoadOwner === p.id) det.push("🛣️");
+                if (largestArmyOwner === p.id) det.push("⚔️");
+                if (vpCards) det.push(`⭐×${vpCards}`);
+                return `<div class="victory-row ${p.id===winner.id?'winner':''}"><div class="victory-dot" style="background:${p.color};box-shadow:0 0 10px ${p.color}"></div><span style="flex:1">${p.name}</span><span style="font-size:20px;font-weight:900">${pts} VP</span><span style="font-size:11px;color:rgba(255,255,255,0.5)">${det.join(', ')||'none'}</span></div>`;
+            }).join("");
+            modalRoot.innerHTML = `<div class="modal-overlay"><div class="modal"><div class="victory-title" style="color:${winner.color}">🏆 ${winner.name} wins!</div><div class="modal-subtitle" style="text-align:center">${VICTORY_POINTS} points!</div><div class="victory-results">${rows}</div><div class="modal-actions"><button onclick="resetGame()" style="font-size:16px;padding:14px">🔄 New game</button><button onclick="closeVictoryModal()">👁️ Watch</button></div></div></div>`;
+        }
+
+        function closeVictoryModal() {
+            document.body.classList.remove("modal-open");
+            modalRoot.innerHTML = "";
+            updateGameUI();
+        }
+
+        function upgradeToCity(vertex, player, pointEl) {
+            if (!canAfford(player, BUILD_COSTS.city)) {
+                showToast("Not enough 🪨🪨🪨+🌾🌾.", "error");
+                flashPoint(pointEl, "rgba(255,60,48,0.65)");
+                return;
+            }
+            payCost(player, BUILD_COSTS.city);
+            vertex.building = "city";
+            pointEl.classList.remove("has-settlement");
+            pointEl.classList.add("has-city");
+            showToast(`${player.name} upgrades to a city!`, "success");
+            updateGameUI();
+            checkVictory();
+        }
+
+        function renderRoads() {
+            roadsLayer.innerHTML = "";
+            const bw = board.clientWidth,
+                bh = board.clientHeight;
+            roadsLayer.setAttribute("width", bw);
+            roadsLayer.setAttribute("height", bh);
+            roadsLayer.setAttribute("viewBox", `0 0 ${bw} ${bh}`);
+            edgeList.forEach(edge => {
+                const vl = document.createElementNS(SVG_NS, "line");
+                vl.classList.add("road-visible");
+                if (edge.road) {
+                    vl.classList.add("road-built");
+                    vl.style.setProperty("--road-color", edge.color);
+                }
+                vl.setAttribute("x1", edge.a.x);
+                vl.setAttribute("y1", edge.a.y);
+                vl.setAttribute("x2", edge.b.x);
+                vl.setAttribute("y2", edge.b.y);
+                const hl = document.createElementNS(SVG_NS, "line");
+                hl.classList.add("road-hitbox");
+                hl.setAttribute("x1", edge.a.x);
+                hl.setAttribute("y1", edge.a.y);
+                hl.setAttribute("x2", edge.b.x);
+                hl.setAttribute("y2", edge.b.y);
+                hl.addEventListener("mouseenter", () => {
+                    if (!edge.road && buildMode === "road" && phase === "build" && !isModalOpen() && !isVictory() && !isRobberMode()) vl.classList.add("road-hover");
+                });
+                hl.addEventListener("mouseleave", () => vl.classList.remove("road-hover"));
+                hl.addEventListener("click", (ev) => {
+                    ev.stopPropagation();
+                    if (isModalOpen() || isVictory() || isRobberMode()) return;
+                    const player = getCurrentPlayer();
+                    if (buildMode !== "road") return;
+                    if (phase !== "build") {
+                        showToast("Roll the dice first.", "warning");
+                        return;
+                    }
+                    if (edge.road) {
+                        showToast("Already occupied.", "warning");
+                        return;
+                    }
+                    if (isSetupPhase()) {
+                        if (!setupSettlementPlaced) {
+                            showToast("Place a settlement first.", "warning");
+                            return;
+                        }
+                        if (setupRoadPlaced) {
+                            showToast("You already placed a road.", "warning");
+                            return;
+                        }
+                        if (!((edge.a.owner === player.id && edge.a.building) || (edge.b.owner === player.id && edge.b.building))) {
+                            showToast("Must be adjacent to your settlement.", "warning");
+                            return;
+                        }
+                    } else {
+                        if (freeRoadsRemaining === 0) {
+                            if (!canAfford(player, BUILD_COSTS.road)) {
+                                showToast("Not enough 🪵+🧱.", "error");
+                                return;
+                            }
+                            if (!canBuildRoadOnEdge(edge, player.id)) {
+                                showToast("Must connect to a settlement/road.", "warning");
+                                return;
+                            }
+                            payCost(player, BUILD_COSTS.road);
+                        } else freeRoadsRemaining--;
+                    }
+                    edge.road = "road";
+                    edge.owner = player.id;
+                    edge.color = player.color;
+                    vl.classList.remove("road-hover");
+                    vl.classList.add("road-built");
+                    vl.style.setProperty("--road-color", player.color);
+                    if (isSetupPhase()) {
+                        setupRoadPlaced = true;
+                        showToast(`${player.name} placed a road.`, "success");
+                    } else {
+                        showToast(`${player.name} placed a road${freeRoadsRemaining>0?' (free)':''}.`, "success");
+                        recalculateLongestRoad();
+                    }
+                    if (freeRoadsRemaining === 0 && buildMode === "road") {
+                        buildMode = "settlement";
+                        document.body.classList.add("mode-settlement");
+                        document.body.classList.remove("mode-road");
+                    }
+                    updateGameUI();
+                });
+                roadsLayer.appendChild(vl);
+                roadsLayer.appendChild(hl);
+            });
+        }
+
+        function renderVertices() {
+            pointsLayer.innerHTML = "";
+            vertexList.forEach(v => {
+                const point = document.createElement("div");
+                point.className = "vertex-point";
+                if (v.building === "settlement") {
+                    point.classList.add("has-settlement");
+                    point.style.setProperty("--player-color", v.color);
+                }
+                if (v.building === "city") {
+                    point.classList.add("has-city");
+                    point.style.setProperty("--player-color", v.color);
+                }
+                const player = getCurrentPlayer();
+                if (v.building === "settlement" && v.owner === player.id && phase === "build" && !isSetupPhase() && !isVictory()) {
+                    point.classList.add("upgradeable");
+                    point.title = "Click to upgrade (🪨🪨🪨+🌾🌾)";
+                }
+                point.style.setProperty("--x", `${v.x}px`);
+                point.style.setProperty("--y", `${v.y}px`);
+                point.addEventListener("click", (ev) => {
+                    ev.stopPropagation();
+                    if (isModalOpen() || isVictory() || isRobberMode()) return;
+                    const player = getCurrentPlayer();
+                    if (buildMode !== "settlement") return;
+                    if (phase !== "build") {
+                        showToast("Roll the dice first.", "warning");
+                        flashPoint(point, "rgba(255,180,0,0.7)");
+                        return;
+                    }
+                    if (v.building === "settlement" && v.owner === player.id && !isSetupPhase()) {
+                        upgradeToCity(v, player, point);
+                        return;
+                    }
+                    if (v.building) {
+                        showToast("Already occupied.", "warning");
+                        flashPoint(point, "rgba(255,180,0,0.7)");
+                        return;
+                    }
+                    if (isSetupPhase()) {
+                        if (setupSettlementPlaced) {
+                            showToast("You already placed a settlement.", "warning");
+                            flashPoint(point, "rgba(255,180,0,0.7)");
+                            return;
+                        }
+                        if (isDistanceRuleViolated(v)) {
+                            showToast("Too close to another settlement.", "warning");
+                            flashPoint(point, "rgba(255,180,0,0.7)");
+                            return;
+                        }
+                        v.building = "settlement";
+                        v.owner = player.id;
+                        v.color = player.color;
+                        point.classList.add("has-settlement");
+                        point.style.setProperty("--player-color", player.color);
+                        setupSettlementPlaced = true;
+                        showToast(`${player.name} placed a settlement.`, "success");
+                        updateGameUI();
+                        return;
+                    }
+                    if (!canAfford(player, BUILD_COSTS.settlement)) {
+                        showToast("Not enough resources.", "error");
+                        flashPoint(point, "rgba(255,60,48,0.65)");
+                        return;
+                    }
+                    if (isDistanceRuleViolated(v)) {
+                        showToast("Too close to another settlement.", "warning");
+                        flashPoint(point, "rgba(255,180,0,0.7)");
+                        return;
+                    }
+                    if (playerHasAnySettlement(player.id) && !hasAdjacentRoad(v, player.id)) {
+                        showToast("Must be adjacent to a road.", "warning");
+                        flashPoint(point, "rgba(255,180,0,0.7)");
+                        return;
+                    }
+                    payCost(player, BUILD_COSTS.settlement);
+                    v.building = "settlement";
+                    v.owner = player.id;
+                    v.color = player.color;
+                    point.classList.add("has-settlement");
+                    point.style.setProperty("--player-color", player.color);
+                    showToast(`${player.name} placed a settlement.`, "success");
+                    updateGameUI();
+                    checkVictory();
+                });
+                pointsLayer.appendChild(point);
+            });
+        }
+
+        function renderInteractionLayer() {
+            renderRoads();
+            renderVertices();
+        }
+
+        function generateMap() {
+            tilesLayer.innerHTML = "";
+            pointsLayer.innerHTML = "";
+            roadsLayer.innerHTML = "";
+            vertices = new Map();
+            vertexList = [];
+            edges = new Map();
+            edgeList = [];
+            tiles = [];
+            const ts = getTileSize();
+            const bw = board.clientWidth,
+                bh = board.clientHeight;
+            const cs = ts * 0.9 + HEX_GAP,
+                rs = ts * 0.74 + HEX_GAP;
+            const aw = bw - SAFE_INNER_PADDING * 2,
+                ah = bh - SAFE_INNER_PADDING * 2;
+            const rows = Math.floor((ah - ts) / rs) + 1,
+                cols = Math.floor((aw - ts) / cs) + 1;
+            document.documentElement.style.setProperty("--hex-size", `${ts}px`);
+            const mapData = [];
+            for (let row = 0; row < rows; row++) {
+                mapData[row] = [];
+                for (let col = 0; col < cols; col++) {
+                    const ox = row % 2 === 0 ? 0 : cs / 2;
+                    const x = SAFE_INNER_PADDING + col * cs + ox,
+                        y = SAFE_INNER_PADDING + row * rs;
+                    if (x < SAFE_INNER_PADDING || y < SAFE_INNER_PADDING || x + ts > bw - SAFE_INNER_PADDING || y + ts > bh - SAFE_INNER_PADDING) continue;
+                    const terrain = pickTerrain(row, col, mapData);
+                    const number = pickTileNumber(terrain);
+                    mapData[row][col] = terrain;
+                    const tile = {
+                        id: `tile-${row}-${col}`,
+                        row,
+                        col,
+                        x,
+                        y,
+                        size: ts,
+                        terrain,
+                        number,
+                        hexEl: null,
+                        port: null
+                    };
+                    tiles.push(tile);
+                    const hexEl = createHex(x, y, terrain, number);
+                    tile.hexEl = hexEl;
+                    hexEl.addEventListener("click", () => {
+                        if (isRobberMode() && pendingKnightAction && tile.terrain !== "water") onRobberHexClick(tile);
+                    });
+                    registerTileInteractionPoints(tile);
+                }
+            }
+            assignPorts();
+            const landTiles = tiles.filter(t => t.terrain !== "water");
+            if (landTiles.length > 0) {
+                const sandTile = landTiles.find(t => t.terrain === "sand") || landTiles[Math.floor(Math.random() * landTiles.length)];
+                robberTile = sandTile;
+                sandTile.hexEl.classList.add("has-robber");
+            }
+            renderInteractionLayer();
+        }
+
+        function highlightProducingTiles(diceNumber) {
+            const producingTiles = tiles.filter(t => t.number === diceNumber && t.terrain !== "water" && t.terrain !== "sand" && t !== robberTile);
+            for (const tile of producingTiles) {
+                tile.hexEl.classList.add("producing");
+                tile.hexEl.addEventListener("animationend", function handler() {
+                    tile.hexEl.classList.remove("producing");
+                    tile.hexEl.removeEventListener("animationend", handler);
+                });
+            }
+        }
+
+        function spawnFloatingResources(diceNumber) {
+            const panelRect = resourcesList.getBoundingClientRect();
+            const panelCenterX = panelRect.left + panelRect.width / 2;
+            const panelCenterY = panelRect.top + panelRect.height / 2;
+
+            const producingTiles = tiles.filter(t => t.number === diceNumber && t.terrain !== "water" && t.terrain !== "sand" && t !== robberTile);
+            const productionByResource = new Map();
+
+            vertexList.forEach(v => {
+                if (!v.building || !v.owner) return;
+                const owner = players.find(p => p.id === v.owner);
+                if (!owner || owner.id !== getCurrentPlayer().id) return;
+                v.touchingTiles.forEach(tile => {
+                    if (tile.number !== diceNumber) return;
+                    if (tile.terrain === "water" || tile.terrain === "sand") return;
+                    if (robberTile === tile) return;
+                    const amt = v.building === "city" ? 2 : 1;
+                    const key = `${tile.id}-${tile.terrain}`;
+                    if (!productionByResource.has(key)) productionByResource.set(key, {
+                        tile,
+                        terrain: tile.terrain,
+                        amount: 0
+                    });
+                    productionByResource.get(key).amount += amt;
+                });
+            });
+
+            for (const [key, data] of productionByResource) {
+                const tile = data.tile;
+                const startX = tile.x + tile.size / 2;
+                const startY = tile.y + tile.size / 2;
+                const endX = panelCenterX - startX;
+                const endY = panelCenterY - startY;
+
+                const el = document.createElement("div");
+                el.className = "floating-resource";
+                el.textContent = `+${data.amount} ${RESOURCE_EMOJIS[data.terrain]}`;
+                el.style.left = `${startX}px`;
+                el.style.top = `${startY}px`;
+                el.style.setProperty("--float-end-x", `${endX}px`);
+                el.style.setProperty("--float-end-y", `${endY}px`);
+                document.body.appendChild(el);
+                el.addEventListener("animationend", () => el.remove());
+            }
+        }
+
+        function rollDice() {
+            if (isRolling || isModalOpen() || isVictory() || isRobberMode()) return;
+            if (phase !== "roll") {
+                showToast("You already rolled.", "warning");
+                return;
+            }
+            if (isSetupPhase()) {
+                phase = "build";
+                updateGameUI();
+                showToast(`${getCurrentPlayer().name}: place settlement + road.`, "info");
+                return;
+            }
+            isRolling = true;
+            rollDiceBtn.disabled = true;
+            diceDisplay.textContent = "🎲 🎲";
+            diceDisplay.classList.remove("shake");
+            void diceDisplay.offsetWidth;
+            diceDisplay.classList.add("shake");
+            setTimeout(() => {
+                const d1 = Math.floor(Math.random() * 6) + 1,
+                    d2 = Math.floor(Math.random() * 6) + 1,
+                    total = d1 + d2;
+                diceDisplay.textContent = `${d1} + ${d2} = ${total}`;
+                phase = "build";
+                isRolling = false;
+                if (total === 7) {
+                    showToast(`${getCurrentPlayer().name} rolled a 7.`, "success");
+                    handleSevenRoll();
+                } else {
+                    highlightProducingTiles(total);
+                    produceResources(total);
+                    setTimeout(() => spawnFloatingResources(total), 400);
+                    showToast(`${getCurrentPlayer().name} rolled ${total}.`, "success");
+                }
+                updateGameUI();
+            }, 650);
+        }
+
+        function produceResources(diceNumber) {
+            if (robberTile && robberTile.number === diceNumber) {
+                showToast(`Result ${diceNumber}: blocked.`, "warning");
+                return;
+            }
+            const summary = new Map();
+            vertexList.forEach(v => {
+                if (!v.building || !v.owner) return;
+                const owner = players.find(p => p.id === v.owner);
+                if (!owner) return;
+                v.touchingTiles.forEach(tile => {
+                    if (tile.number !== diceNumber) return;
+                    if (tile.terrain === "water" || tile.terrain === "sand") return;
+                    if (robberTile === tile) return;
+                    const amt = v.building === "city" ? 2 : 1;
+                    owner.resources[tile.terrain] += amt;
+                    const key = `${owner.id}-${tile.terrain}`;
+                    if (!summary.has(key)) summary.set(key, {
+                        playerName: owner.name,
+                        resource: tile.terrain,
+                        amount: 0
+                    });
+                    summary.get(key).amount += amt;
+                });
+            });
+            if (summary.size === 0) {
+                showToast(`Result ${diceNumber}: nothing produced.`, "warning");
+                return;
+            }
+            const msg = [...summary.values()].map(i => `${i.playerName} +${i.amount} ${RESOURCE_EMOJIS[i.resource]}`).join(", ");
+            showToast(`Production: ${msg}.`, "success");
+        }
+
+        function handleSevenRoll() {
+            robberQueue = [];
+            players.forEach(p => {
+                const t = getTotalResources(p);
+                if (t <= 8) return;
+                robberQueue.push({
+                    player: p,
+                    amountToDiscard: Math.floor(t / 2),
+                    selected: {
+                        wood: 0,
+                        wool: 0,
+                        wheat: 0,
+                        clay: 0,
+                        stone: 0
+                    }
+                });
+            });
+            if (robberQueue.length === 0) {
+                showToast("7: no one has >8 cards.", "warning");
+                return;
+            }
+            showToast("Robber!", "error");
+            processRobberQueue();
+        }
+
+        function processRobberQueue() {
+            if (robberQueue.length === 0) {
+                closeRobberModal();
+                updateGameUI();
+                return;
+            }
+            currentRobberEntry = robberQueue.shift();
+            document.body.classList.add("modal-open");
+            renderRobberModal();
+        }
+
+        function closeRobberModal() {
+            document.body.classList.remove("modal-open");
+            currentRobberEntry = null;
+            modalRoot.innerHTML = "";
+        }
+
+        function getRobberSelectedTotal(e) {
+            return RESOURCE_TYPES.reduce((s, r) => s + e.selected[r], 0);
+        }
+
+        function adjustRobberCount(res, delta) {
+            const e = currentRobberEntry;
+            if (!e) return;
+            const nv = e.selected[res] + delta,
+                ts = getRobberSelectedTotal(e);
+            if (nv < 0 || nv > e.player.resources[res] || (delta > 0 && ts >= e.amountToDiscard)) return;
+            e.selected[res] = nv;
+            renderRobberModal();
+        }
+
+        function renderRobberModal() {
+            const e = currentRobberEntry;
+            if (!e) return;
+            const ts = getRobberSelectedTotal(e),
+                rem = e.amountToDiscard - ts;
+            const rows = RESOURCE_TYPES.map(r => {
+                const o = e.player.resources[r],
+                    s = e.selected[r],
+                    ci = s < o && ts < e.amountToDiscard;
+                return `<div class="robber-row"><span class="robber-resource-label">${RESOURCE_EMOJIS[r]} ${o}</span>
+                    <button onclick="adjustRobberCount('${r}',-1)" ${s===0?'disabled':''}>−</button><span class="robber-count">${s}</span><button onclick="adjustRobberCount('${r}',1)" ${ci?'':'disabled'}>+</button></div>`;
+            }).join("");
+            modalRoot.innerHTML = `<div class="modal-overlay"><div class="modal"><div class="modal-title" style="color:${e.player.color}">🎯 ${e.player.name}</div><div class="modal-subtitle">Discard ${e.amountToDiscard}.</div><div class="robber-list">${rows}</div><div class="modal-summary">${ts}/${e.amountToDiscard}${rem===0?' ✓':''}</div><div class="modal-actions"><button onclick="confirmRobberDiscard()" ${rem===0?'':'disabled'}>✅ Confirm</button></div></div></div>`;
+        }
+
+        function confirmRobberDiscard() {
+            const e = currentRobberEntry;
+            if (!e || getRobberSelectedTotal(e) !== e.amountToDiscard) return;
+            RESOURCE_TYPES.forEach(r => e.player.resources[r] -= e.selected[r]);
+            showToast(`${e.player.name} discarded cards.`, "error");
+            currentRobberEntry = null;
+            processRobberQueue();
+        }
+
+        function openShopModal() {
+            if (isModalOpen() || isVictory() || isRobberMode()) return;
+            if (isSetupPhase() || phase !== "build") {
+                showToast("Only during build phase.", "warning");
+                return;
+            }
+            const player = getCurrentPlayer();
+            if (!RESOURCE_TYPES.some(r => player.resources[r] >= getPlayerBestTradeRatio(player.id, r))) {
+                showToast("Not enough resources.", "warning");
+                return;
+            }
+            shopState = {
+                give: null,
+                receive: null
+            };
+            document.body.classList.add("modal-open");
+            renderShopModal();
+        }
+
+        function closeShopModal() {
+            document.body.classList.remove("modal-open");
+            modalRoot.innerHTML = "";
+            shopState = {
+                give: null,
+                receive: null
+            };
+            updateGameUI();
+        }
+
+        function selectShopGive(r) {
+            shopState.give = shopState.give === r ? null : r;
+            if (shopState.receive === shopState.give) shopState.receive = null;
+            renderShopModal();
+        }
+
+        function selectShopReceive(r) {
+            if (r === shopState.give) return;
+            shopState.receive = shopState.receive === r ? null : r;
+            renderShopModal();
+        }
+
+        function renderShopModal() {
+            const player = getCurrentPlayer();
+            const ports = getPlayerPorts(player.id);
+            let portInfoHTML = '';
+            if (ports.length > 0) {
+                const badges = ports.map(p => `<span class="port-badge">⚓ ${p.label}</span>`).join("");
+                portInfoHTML = `<div class="port-info">Your ports: ${badges}</div>`;
+            }
+            const gb = RESOURCE_TYPES.map(r => {
+                const ratio = getPlayerBestTradeRatio(player.id, r);
+                const canGive = player.resources[r] >= ratio;
+                const label = ratio < BASE_TRADE_RATIO ? `${RESOURCE_EMOJIS[r]} ${player.resources[r]} (${ratio}:1)` : `${RESOURCE_EMOJIS[r]} ${player.resources[r]}`;
+                return `<button class="resource-toggle ${shopState.give===r?'selected':''}" ${canGive?'':'disabled'} onclick="selectShopGive('${r}')">${label}</button>`;
+            }).join("");
+            const rb = RESOURCE_TYPES.map(r =>
+                `<button class="resource-toggle ${shopState.receive===r?'selected':''}" ${r===shopState.give?'disabled':''} onclick="selectShopReceive('${r}')">${RESOURCE_EMOJIS[r]}</button>`
+            ).join("");
+            let summary = "Choose resources.";
+            if (shopState.give && shopState.receive) {
+                const ratio = getPlayerBestTradeRatio(player.id, shopState.give);
+                summary = `${ratio}x ${RESOURCE_EMOJIS[shopState.give]} → 1x ${RESOURCE_EMOJIS[shopState.receive]}`;
+            }
+            modalRoot.innerHTML = `<div class="modal-overlay"><div class="modal"><div class="modal-title">🏪 Bank</div>${portInfoHTML}<div class="modal-section-label">You give:</div><div class="resource-toggle-row">${gb}</div><div class="modal-section-label">You receive:</div><div class="resource-toggle-row">${rb}</div><div class="modal-summary">${summary}</div><div class="modal-actions"><button onclick="confirmShopTrade()" ${shopState.give&&shopState.receive?'':'disabled'}>Trade</button><button onclick="closeShopModal()">Cancel</button></div></div></div>`;
+        }
+
+        function confirmShopTrade() {
+            const player = getCurrentPlayer();
+            if (!shopState.give || !shopState.receive) {
+                closeShopModal();
+                return;
+            }
+            const ratio = getPlayerBestTradeRatio(player.id, shopState.give);
+            if (player.resources[shopState.give] < ratio) {
+                showToast("Not enough resources.", "error");
+                closeShopModal();
+                return;
+            }
+            player.resources[shopState.give] -= ratio;
+            player.resources[shopState.receive] += 1;
+            showToast(`${player.name} traded.`, "success");
+            shopState = {
+                give: null,
+                receive: null
+            };
+            updateGameUI();
+            if (RESOURCE_TYPES.some(r => player.resources[r] >= getPlayerBestTradeRatio(player.id, r))) renderShopModal();
+            else closeShopModal();
+        }
+
+        function endTurn() {
+            if (isRolling || isModalOpen() || isVictory() || isRobberMode()) return;
+            if (freeRoadsRemaining > 0) {
+                showToast("Use free roads first.", "warning");
+                return;
+            }
+            if (isSetupPhase() && (!setupSettlementPlaced || !setupRoadPlaced)) {
+                showToast("Place settlement + road.", "warning");
+                return;
+            }
+            getCurrentPlayer().hasBoughtCardThisTurn = false;
+            if (gamePhase === "setup-forward") {
+                currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+                setupSettlementPlaced = false;
+                setupRoadPlaced = false;
+                if (currentPlayerIndex === 0) {
+                    gamePhase = "setup-backward";
+                    setupBackwardStep = 0;
+                    currentPlayerIndex = setupBackwardOrder[setupBackwardStep];
+                    showToast("Setup 2/2.", "success");
+                }
+            } else if (gamePhase === "setup-backward") {
+                setupBackwardStep++;
+                setupSettlementPlaced = false;
+                setupRoadPlaced = false;
+                if (setupBackwardStep >= setupBackwardOrder.length) {
+                    gamePhase = "normal";
+                    currentPlayerIndex = 0;
+                    showToast("Normal game!", "success");
+                    recalculateLongestRoad();
+                } else currentPlayerIndex = setupBackwardOrder[setupBackwardStep];
+            } else currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+            turnNumber++;
+            phase = "roll";
+            buildMode = "settlement";
+            freeRoadsRemaining = 0;
+            document.body.classList.add("mode-settlement");
+            document.body.classList.remove("mode-road", "mode-robber");
+            pendingKnightAction = null;
+            diceDisplay.textContent = "🎲";
+            updateGameUI();
+            if (isSetupPhase()) {
+                phase = "build";
+                updateGameUI();
+            } else showToast(`${getCurrentPlayer().name}: roll the dice.`, "success");
+            maybeRunAIPlayerTurn();
+        }
+
+        function resetGame() {
+            players.forEach(p => {
+                p.resources = createStartingResources();
+                p.handCards = [];
+                p.playedKnights = 0;
+                p.hasBoughtCardThisTurn = false;
+            });
+            currentPlayerIndex = 0;
+            turnNumber = 0;
+            gamePhase = "setup-forward";
+            setupBackwardOrder = createSetupBackwardOrder(players.length);
+            setupBackwardStep = 0;
+            setupSettlementPlaced = false;
+            setupRoadPlaced = false;
+            phase = "roll";
+            buildMode = "settlement";
+            isRolling = false;
+            freeRoadsRemaining = 0;
+            robberQueue = [];
+            currentRobberEntry = null;
+            longestRoadOwner = null;
+            largestArmyOwner = null;
+            robberTile = null;
+            pendingKnightAction = null;
+            shopState = {
+                give: null,
+                receive: null
+            };
+            developmentDeck = createDevelopmentDeck();
+            document.body.classList.remove("modal-open", "mode-robber");
+            modalRoot.innerHTML = "";
+            document.body.classList.add("mode-settlement");
+            document.body.classList.remove("mode-road");
+            diceDisplay.textContent = "🎲";
+            generateMap();
+            updateGameUI();
+            phase = "build";
+            updateGameUI();
+            showToast("New game! Setup.", "success");
+        }
+
+        function updateGameUI() {
+            const player = getCurrentPlayer();
+            currentPlayerDot.style.setProperty("--dot-color", player.color);
+            currentPlayerName.textContent = isVictory() ? "🏆 Game Over" : `${player.name}${player.type === "ai" ? " 🤖" : ""}`;
+            if (isVictory()) {
+                phaseLabel.textContent = "🏆 Game Over";
+                rollDiceBtn.disabled = true;
+                diceDisplay.textContent = "🏆";
+            } else if (isSetupPhase()) {
+                phaseLabel.textContent = gamePhase === "setup-forward" ? "Setup 1/2" : "Setup 2/2";
+                rollDiceBtn.disabled = true;
+                diceDisplay.textContent = "🏗️";
+            } else if (phase === "roll") {
+                phaseLabel.textContent = "Roll phase";
+                rollDiceBtn.disabled = false;
+            } else {
+                phaseLabel.textContent = freeRoadsRemaining > 0 ? `Free roads: ${freeRoadsRemaining}` : "Build phase";
+                rollDiceBtn.disabled = true;
+            }
+            const totalResources = getTotalResources(player);
+            const pillHTML = `<span class="resource-total-pill">${totalResources} ${totalResources === 1 ? "card" : "cards"}</span>`;
+            resourcesList.innerHTML = RESOURCE_TYPES.map(r => {
+                const a = player.resources[r];
+                return `<div class="resource-item ${a===0?'empty':''}"><span>${RESOURCE_EMOJIS[r]}</span><span>${a}</span></div>`;
+            }).join("") + pillHTML;
+
+            document.getElementById("score-pills-container").innerHTML = players.map((sp, idx) => {
+                const pts = getPlayerPoints(sp.id);
+                let badges = "";
+                if (longestRoadOwner === sp.id) badges += '<span class="badge">🛣️</span>';
+                if (largestArmyOwner === sp.id) badges += '<span class="badge">⚔️</span>';
+                const hc = sp.handCards.length;
+                if (hc > 0) badges += `<span class="badge">🃏${hc}</span>`;
+                if (sp.type === "ai") badges += '<span class="badge">🤖</span>';
+                return `<div class="score-pill ${idx===currentPlayerIndex?'active':''}"><span class="dot" style="--dot-color:${sp.color}"></span><span>${sp.name}</span><span>${pts} VP${badges}</span></div>`;
+            }).join("");
+
+            const ad = isVictory() || isRobberMode();
+            const cs = !ad && (isSetupPhase() ? !setupSettlementPlaced : (phase === "build" && freeRoadsRemaining === 0 && canAfford(player, BUILD_COSTS.settlement)));
+            const cr = !ad && (isSetupPhase() ? (setupSettlementPlaced && !setupRoadPlaced) : (phase === "build" && (freeRoadsRemaining > 0 || canAfford(player, BUILD_COSTS.road))));
+            const cShop = !ad && !isSetupPhase() && phase === "build" && RESOURCE_TYPES.some(r => player.resources[r] >= getPlayerBestTradeRatio(player.id, r));
+            const cBuy = !ad && !isSetupPhase() && phase === "build" && !player.hasBoughtCardThisTurn && canAfford(player, BUILD_COSTS.developmentCard) && developmentDeck.length > 0;
+            const cHand = !ad && !isSetupPhase() && player.handCards.some(c => c.type !== "victoryPoint");
+            endTurnBtn.disabled = ad || isRolling;
+            rollDiceBtn.disabled = ad || phase !== "roll";
+            buildSettlementBtn.disabled = !cs;
+            buildRoadBtn.disabled = !cr;
+            openShopBtn.disabled = !cShop;
+            buyCardBtn.disabled = !cBuy;
+            handBtn.disabled = !cHand;
+            handCount.textContent = player.handCards.length;
+            buildSettlementBtn.classList.toggle("active", buildMode === "settlement");
+            buildRoadBtn.classList.toggle("active", buildMode === "road");
+            if (isSetupPhase() && phase === "build" && !ad) {
+                if (!setupSettlementPlaced) {
+                    buildMode = "settlement";
+                    document.body.classList.add("mode-settlement");
+                    document.body.classList.remove("mode-road");
+                } else if (!setupRoadPlaced) {
+                    buildMode = "road";
+                    document.body.classList.remove("mode-settlement");
+                    document.body.classList.add("mode-road");
+                }
+                buildSettlementBtn.classList.toggle("active", buildMode === "settlement");
+                buildRoadBtn.classList.toggle("active", buildMode === "road");
+            }
+        }
+
+        function showToast(msg, type = "info") {
+            const t = document.createElement("div");
+            t.className = `toast ${type}`;
+            t.textContent = msg;
+            toastContainer.appendChild(t);
+            setTimeout(() => {
+                t.style.opacity = "0";
+                t.style.transform = "translateY(-8px)";
+                setTimeout(() => t.remove(), 220);
+            }, 2600);
+        }
+
+        function flashPoint(el, color) {
+            el.style.transition = "0.1s";
+            el.style.background = color;
+            setTimeout(() => el.style.background = "", 300);
+        }
+
+        function setupTooltips() {
+            const infoBtn = document.querySelector(".info-tooltip-container .circle-btn");
+            const rulesBtn = document.querySelector(".rules-tooltip-container .circle-btn");
+            const infoTip = document.querySelector(".tooltip");
+            const rulesTip = document.querySelector(".tooltip-rules");
+
+            function toggle(tip) {
+                const isVisible = tip.classList.contains("visible");
+                infoTip.classList.remove("visible");
+                rulesTip.classList.remove("visible");
+                if (!isVisible) tip.classList.add("visible");
+            }
+
+            infoBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                toggle(infoTip);
+            });
+            rulesBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                toggle(rulesTip);
+            });
+
+            document.addEventListener("click", () => {
+                infoTip.classList.remove("visible");
+                rulesTip.classList.remove("visible");
+            });
+
+            infoTip.addEventListener("click", (e) => e.stopPropagation());
+            rulesTip.addEventListener("click", (e) => e.stopPropagation());
+        }
+
+        window.addEventListener("resize", () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                if (document.body.classList.contains("lobby-open")) return;
+                generateMap();
+                updateGameUI();
+            }, 200);
+        });
+
+        developmentDeck = createDevelopmentDeck();
+        renderLobbyPlayerRows();
+        setupTooltips();
+        const video = document.querySelector('.lobby-video');
+        let videoPlaying = false;
+
+        video.addEventListener('playing', () => {
+            videoPlaying = true;
+        });
+
+        setTimeout(() => {
+            if (!videoPlaying) {
+                document.querySelector('.lobby-overlay').style.backgroundImage = 'url("background.png")';
+                document.querySelector('.lobby-overlay').style.backgroundSize = 'cover';
+                video.style.display = 'none';
+            }
+        }, 200);
+    </script>
+</body>
+
+</html>
